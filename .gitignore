@@ -1,0 +1,22 @@
+# Dependencies
+**/node_modules/
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+env/
+
+# Build & Output
+**/dist/
+**/.vite-cache/
+
+# Configurations & Environment Variables
+.env
+**/.env.local
+**/.env.*.local
+.vscode/
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
