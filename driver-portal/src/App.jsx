@@ -55,6 +55,8 @@ export default function App() {
     localStorage.setItem('ssg_driver_online', isOnline);
   }, [isOnline]);
 
+  const [showProfile, setShowProfile] = useState(false);
+
   const [openRides, setOpenRides] = useState([]);
 
   const prevOpenJobsLength = useRef(0);
@@ -159,7 +161,7 @@ export default function App() {
 
   return (
     <div className="dash">
-      <header className="dash-top">
+      <header className="dash-top" style={{ position: 'relative' }}>
         <div className="dash-brand">
           <span className="dash-brand-bolt" /> SSG LOGISTICS
           <span className="dash-portal-tag">Driver</span>
@@ -195,9 +197,121 @@ export default function App() {
               {isOnline ? '🟢' : '⚫'}
             </button>
           </div>
-          <span>{user.name}{user.vehicleNumber ? ` · ${user.vehicleNumber}` : ''}</span>
-          <button className="ghost-btn" onClick={() => setUser(null)}>Logout</button>
+          
+          <div 
+            onClick={() => setShowProfile(!showProfile)}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              cursor: 'pointer', 
+              padding: '6px 12px', 
+              borderRadius: '8px', 
+              background: showProfile ? 'rgba(255,255,255,0.06)' : 'transparent',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => { if(!showProfile) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+            onMouseLeave={(e) => { if(!showProfile) e.currentTarget.style.background = 'transparent' }}
+          >
+            <span style={{ fontSize: '15px' }}>👤</span>
+            <span style={{ fontWeight: '500', color: 'var(--ink-100)' }}>{user.name}</span>
+            <span style={{ fontSize: '10px', transition: 'transform 0.2s', transform: showProfile ? 'rotate(180deg)' : 'rotate(0deg)', color: 'var(--ink-400)' }}>▼</span>
+          </div>
         </div>
+
+        <AnimatePresence>
+          {showProfile && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                position: 'absolute',
+                top: '100%',
+                right: '40px',
+                width: '320px',
+                background: 'rgba(13, 23, 38, 0.95)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderTop: 'none',
+                borderRadius: '0 0 16px 16px',
+                boxShadow: '0 16px 40px rgba(0, 0, 0, 0.5), 0 0 20px var(--accent-glow)',
+                padding: '24px',
+                zIndex: 99,
+                color: 'var(--ink-100)',
+                textAlign: 'left'
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
+                <div style={{
+                  width: '44px',
+                  height: '44px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--accent), var(--accent-deep))',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '18px',
+                  color: 'var(--ink-on-accent)',
+                  fontWeight: 'bold'
+                }}>
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{user.name}</h3>
+                  <span style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Driver Partner</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', borderTop: '1px solid var(--line)', paddingTop: '14px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--ink-400)' }}>Email</span>
+                  <span style={{ fontWeight: '500' }}>{user.email}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--ink-400)' }}>Phone</span>
+                  <span style={{ fontWeight: '500' }}>{user.phone || 'Not provided'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--ink-400)' }}>Vehicle Type</span>
+                  <span style={{ fontWeight: '500', textTransform: 'capitalize' }}>{user.vehicleType}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--ink-400)' }}>License Plate</span>
+                  <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>{user.vehicleNumber || 'None'}</span>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--line)', borderRadius: '10px', padding: '12px', marginBottom: '18px', textAlign: 'center' }}>
+                <div>
+                  <span style={{ display: 'block', fontSize: '10px', color: 'var(--ink-400)', marginBottom: '4px', textTransform: 'uppercase' }}>Trips Completed</span>
+                  <strong style={{ fontSize: '15px', color: 'var(--ink-100)' }}>{completed.length}</strong>
+                </div>
+                <div>
+                  <span style={{ display: 'block', fontSize: '10px', color: 'var(--ink-400)', marginBottom: '4px', textTransform: 'uppercase' }}>Total Earnings</span>
+                  <strong style={{ fontSize: '15px', color: 'var(--accent)' }}>₹{earnings.toFixed(0)}</strong>
+                </div>
+              </div>
+
+              <button
+                className="ghost-btn"
+                onClick={() => setUser(null)}
+                style={{ width: '100%', borderColor: 'rgba(239, 68, 68, 0.4)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '13px' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                  e.currentTarget.style.borderColor = 'var(--danger)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                }}
+              >
+                🚪 Logout Partner
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </header>
 
       <main className="dash-main driver-grid">
