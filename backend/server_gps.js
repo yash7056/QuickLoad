@@ -101,9 +101,69 @@ async function nextInvoiceNumber() {
     return `SSG/${year}/${String(count + 1).padStart(6, '0')}`;
 }
 
+const otpCache = new Map(); // key: email, value: { otp, expires }
+
+app.post('/api/auth/send-otp', async (req, res) => {
+    try {
+        const { email, phone, role } = req.body;
+        if (!email || !phone) {
+            return res.status(400).json({ error: 'Email and phone number are required.' });
+        }
+
+        // Check if user already exists with this email
+        const existingEmail = await User.findOne({ email });
+        if (existingEmail) {
+            return res.status(400).json({ error: 'An account with this email already exists' });
+        }
+
+        // Check unique vehicleNumber for driver
+        if (role === 'driver' && req.body.vehicleNumber) {
+            const cleanNumber = req.body.vehicleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            const existingVehicle = await User.findOne({ vehicleNumber: cleanNumber });
+            if (existingVehicle) {
+                return res.status(400).json({ error: `Vehicle number ${req.body.vehicleNumber} is already registered by another driver.` });
+            }
+        }
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expires = Date.now() + 5 * 60 * 1000; // 5 minutes
+
+        otpCache.set(email, { otp, expires });
+
+        console.log(`\n========================================`);
+        console.log(`🔑 [OTP DISPATCH] Role: ${role}`);
+        console.log(`📧 Email: ${email} | 📱 Phone: ${phone}`);
+        console.log(`🔢 Simulated 6-Digit OTP: ${otp}`);
+        console.log(`========================================\n`);
+
+        res.status(200).json({ message: 'OTP sent successfully', mockOtp: otp });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/auth/register', async (req, res) => {
     try {
-        const { role, vehicleNumber } = req.body;
+        const { role, vehicleNumber, email, otp } = req.body;
+
+        if (!otp) {
+            return res.status(400).json({ error: 'Verification OTP code is required.' });
+        }
+
+        // Retrieve and verify cached OTP
+        const cached = otpCache.get(email);
+        if (!cached || cached.otp !== otp) {
+            return res.status(400).json({ error: 'Invalid verification OTP code.' });
+        }
+        if (Date.now() > cached.expires) {
+            otpCache.delete(email);
+            return res.status(400).json({ error: 'Verification OTP has expired. Please request a new one.' });
+        }
+
+        // OTP is valid, remove it from cache
+        otpCache.delete(email);
+
         if (role === 'driver' && vehicleNumber) {
             const cleanNumber = vehicleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
             req.body.vehicleNumber = cleanNumber; // Save normalized version
@@ -132,9 +192,13 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
     try {
-        const { role } = req.body;
-        const user = await User.findOne({ email: req.body.email, password: req.body.password });
+        const { role, email, password } = req.body;
+        const user = await User.findOne({ email });
         if (!user) return res.status(401).json({ error: 'Invalid email or password' });
+        
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) return res.status(401).json({ error: 'Invalid email or password' });
+
         if (role && user.role !== role) {
             return res.status(403).json({ error: `This account is registered as a ${user.role}. Use the ${user.role} portal to sign in.` });
         }
