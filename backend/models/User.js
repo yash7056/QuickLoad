@@ -11,4 +11,9 @@ const userSchema = new mongoose.Schema({
     vehicleNumber: { type: String, default: '' }
 }, { timestamps: true });
 
+userSchema.index(
+    { vehicleNumber: 1 },
+    { unique: true, partialFilterExpression: { vehicleNumber: { $gt: "" } } }
+);
+
 module.exports = mongoose.model('User', userSchema);

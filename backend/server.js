@@ -123,18 +123,34 @@ async function nextInvoiceNumber() {
     return `SSG/${year}/${String(count + 1).padStart(6, '0')}`;
 }
 
-// ==========================================
-// Auth Routes
-// ==========================================
 app.post('/api/auth/register', async (req, res) => {
     try {
         console.log("📥 Registration Attempt:", req.body);
+        const { role, vehicleNumber } = req.body;
+        if (role === 'driver' && vehicleNumber) {
+            const cleanNumber = vehicleNumber.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+            req.body.vehicleNumber = cleanNumber; // Save normalized version
+
+            const existing = await User.findOne({ vehicleNumber: cleanNumber });
+            if (existing) {
+                return res.status(400).json({ error: `Vehicle number ${vehicleNumber} is already registered by another driver.` });
+            }
+        }
+
         const user = new User(req.body);
         await user.save();
         res.status(201).json({ message: "Registered", user });
     } catch (e) {
         console.error("❌ Registration Error:", e.message);
-        res.status(400).json({ error: e.code === 11000 ? "An account with this email already exists" : e.message });
+        if (e.code === 11000) {
+            const isVehicleNum = e.message.includes('vehicleNumber') || (e.keyPattern && e.keyPattern.vehicleNumber);
+            return res.status(400).json({
+                error: isVehicleNum
+                    ? 'This vehicle number is already registered by another driver.'
+                    : 'An account with this email already exists'
+            });
+        }
+        res.status(400).json({ error: e.message });
     }
 });
 
