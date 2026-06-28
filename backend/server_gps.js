@@ -13,6 +13,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const nodemailer = require('nodemailer');
 const http = require('http');
 const { Server } = require('socket.io');
 
@@ -103,6 +104,75 @@ async function nextInvoiceNumber() {
 
 const otpCache = new Map(); // key: email, value: { otp, expires }
 
+async function sendEmailOtp(toEmail, otp) {
+    const host = process.env.SMTP_HOST;
+    const port = process.env.SMTP_PORT || 587;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    let transporter;
+
+    if (host && user && pass) {
+        // Real SMTP configuration (e.g. Gmail)
+        transporter = nodemailer.createTransport({
+            host,
+            port: parseInt(port),
+            secure: parseInt(port) === 465, // true for 465, false for other ports
+            auth: { user, pass }
+        });
+        console.log(`📧 [Email Dispatch] Configuring real SMTP server: ${host}`);
+    } else {
+        // Fallback: Ethereal Email auto-generated test account
+        console.log("⚠️ SMTP credentials missing in .env. Configuring Ethereal Email test fallback.");
+        const testAccount = await nodemailer.createTestAccount();
+        transporter = nodemailer.createTransport({
+            host: 'smtp.ethereal.email',
+            port: 587,
+            secure: false,
+            auth: {
+                user: testAccount.user,
+                pass: testAccount.pass
+            }
+        });
+    }
+
+    const mailOptions = {
+        from: user ? `"SSG Logistics" <${user}>` : '"SSG Logistics" <no-reply@ssglogistics.com>',
+        to: toEmail,
+        subject: '[QuickLoad] Verify your email address',
+        text: `Your 6-digit registration verification OTP code is: ${otp}. It will expire in 5 minutes.`,
+        html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px;">
+                <h2 style="color: #f59e0b; text-align: center; margin-bottom: 24px;">QuickLoad Email Verification</h2>
+                <p>Hello,</p>
+                <p>Thank you for registering with SSG Logistics. To complete your sign-up process, please enter the following 6-digit verification code:</p>
+                <div style="text-align: center; margin: 30px 0;">
+                    <span style="font-size: 32px; font-family: monospace; font-weight: bold; color: #0d1726; background: #f3f4f6; padding: 10px 24px; border-radius: 8px; letter-spacing: 4px;">
+                        ${otp}
+                    </span>
+                </div>
+                <p style="color: #6b7280; font-size: 13px;">This code will expire in 5 minutes. If you did not request this code, you can safely ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                <p style="color: #9ca3af; font-size: 11px; text-align: center;">SSG Logistics Pvt. Ltd., Plot No. 14, MIDC Industrial Area, Latur, India</p>
+            </div>
+        `
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+
+    if (!host || !user || !pass) {
+        const previewUrl = nodemailer.getTestMessageUrl(info);
+        console.log(`\n==================================================`);
+        console.log(`📨 [Ethereal Email Dispatch Successful]`);
+        console.log(`📧 Preview URL: ${previewUrl}`);
+        console.log(`==================================================\n`);
+        return { isReal: false, previewUrl };
+    }
+
+    console.log(`📧 [Email Dispatch] Real verification email successfully sent to ${toEmail}.`);
+    return { isReal: true };
+}
+
 app.post('/api/auth/send-otp', async (req, res) => {
     try {
         const { email, phone, role } = req.body;
@@ -132,12 +202,18 @@ app.post('/api/auth/send-otp', async (req, res) => {
         otpCache.set(email, { otp, expires });
 
         console.log(`\n========================================`);
-        console.log(`🔑 [OTP DISPATCH] Role: ${role}`);
+        console.log(`🔑 [OTP GENERATED] Role: ${role}`);
         console.log(`📧 Email: ${email} | 📱 Phone: ${phone}`);
-        console.log(`🔢 Simulated 6-Digit OTP: ${otp}`);
+        console.log(`🔢 6-Digit OTP Code: ${otp}`);
         console.log(`========================================\n`);
 
-        res.status(200).json({ message: 'OTP sent successfully', mockOtp: otp });
+        const result = await sendEmailOtp(email, otp);
+
+        if (result.isReal) {
+            res.status(200).json({ message: 'OTP sent successfully to your email' });
+        } else {
+            res.status(200).json({ message: 'OTP generated (simulated)', mockOtp: otp, previewUrl: result.previewUrl });
+        }
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
