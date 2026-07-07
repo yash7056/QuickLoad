@@ -2,10 +2,9 @@
 
 QuickLoad is a premium, two-sided logistics and cargo booking platform designed to streamline freight transportation. The system connects customers who need cargo moved with drivers, utilizing an AI-powered pricing engine that calculates dynamic, weather- and traffic-aware fare quotes in real time.
 
-## 🌐 Live Access Links
+## 🌐 Live Access Link
 Experience the live application on the web:
-*   🚀 **Customer Portal**: [https://quickload-customer-portal.vercel.app/](https://quickload-customer-portal.vercel.app/) — Book rides, get real-time fare estimates, download tax invoices, and track shipments live.
-*   🚚 **Driver Portal**: [https://quickload-driver-portal.vercel.app/](https://quickload-driver-portal.vercel.app/) — View open jobs, accept bookings, update trip progress, and monitor total earnings.
+*   🚀 **QuickLoad Gateway**: [https://quickload-customer-portal.vercel.app/](https://quickload-customer-portal.vercel.app/) — Access both the Cargo Shipper Portal and the Truck Driver Portal from a single unified landing page.
 
 ---
 
