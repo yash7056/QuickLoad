@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import './AuthPage.css';
 
@@ -73,8 +73,43 @@ export default function AuthPage({ portal, onAuthSuccess, onBackToHome }) {
 
   const isLogin = mode === 'login';
 
+  // Rotating background state for Customer portal
+  const [bgIndex, setBgIndex] = useState(0);
+  const customerBgs = ['/customer-bg-1.png', '/customer-bg-2.png', '/customer-bg-3.png'];
+
+  useEffect(() => {
+    if (portal.key === 'customer') {
+      const interval = setInterval(() => {
+        setBgIndex((idx) => (idx + 1) % 3);
+      }, 3000);
+      return () => clearInterval(interval);
+    }
+  }, [portal.key]);
+
   return (
     <div className="auth-stage" data-portal={portal.key}>
+      {/* Dynamic Backgrounds */}
+      {portal.key === 'customer' ? (
+        <div className="auth-image-carousel">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={bgIndex}
+              className="auth-carousel-img"
+              style={{ backgroundImage: `url(${customerBgs[bgIndex]})` }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.25 }} // subtle background opacity
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1 }}
+            />
+          </AnimatePresence>
+        </div>
+      ) : (
+        <div 
+          className="auth-driver-bg" 
+          style={{ backgroundImage: `url('/driver-bg.png')`, opacity: 0.15 }}
+        />
+      )}
+
       <div className="auth-blobs">
         <div className="auth-blob blob-1" />
         <div className="auth-blob blob-2" />
