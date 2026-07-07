@@ -1,14 +1,26 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { io } from 'socket.io-client';
 import { motion, AnimatePresence } from 'framer-motion';
 import AuthPage from './AuthPage';
-import DriverGPSTracker from './DriverGPSTracker';
+import { downloadInvoice } from './invoice';
+import CustomerLiveMap from './CustomerLiveMap';
+import LandingPage from './LandingPage';
+import DriverDashboard from './DriverDashboard';
 import './App.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const socket = io(API);
 
-const PORTAL = {
+const CUSTOMER_PORTAL = {
+  key: 'customer',
+  label: 'Customer Portal',
+  tagline: 'Book a truck in seconds and watch it move, live, all the way to drop-off.',
+  loginWelcome: 'Welcome Back',
+  registerWelcome: 'Ship With Us',
+  apiBase: API,
+};
+
+const DRIVER_PORTAL = {
   key: 'driver',
   label: 'Driver Portal',
   tagline: 'Open jobs near you, one tap to accept, clear steps for every trip.',
@@ -17,19 +29,30 @@ const PORTAL = {
   apiBase: API,
 };
 
-const NEXT_STATUS = {
-  accepted: 'picked-up',
-  'picked-up': 'in-transit',
-  'in-transit': 'delivered',
-};
-const NEXT_LABEL = {
-  accepted: 'Confirm Pickup',
-  'picked-up': 'Start Trip',
-  'in-transit': 'Mark Delivered',
+const VEHICLE_LABEL = { tempo: 'Tempo', minitruck: 'Mini Truck', trailer: 'Heavy Trailer' };
+
+const STEPS = ['searching', 'accepted', 'picked-up', 'in-transit', 'delivered'];
+const STEP_LABEL = {
+  searching: 'Finding a driver',
+  accepted: 'Driver assigned',
+  'picked-up': 'Cargo picked up',
+  'in-transit': 'On the way',
+  delivered: 'Delivered',
 };
 
 export default function App() {
+  const [view, setView] = useState('landing'); // 'landing' | 'customer' | 'driver'
+
   const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ssg_customer_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [driverUser, setDriverUser] = useState(() => {
     try {
       const stored = localStorage.getItem('ssg_driver_user');
       return stored ? JSON.parse(stored) : null;
@@ -38,296 +61,384 @@ export default function App() {
     }
   });
 
+  const [company, setCompany] = useState(null);
+
   useEffect(() => {
     if (user) {
-      localStorage.setItem('ssg_driver_user', JSON.stringify(user));
+      localStorage.setItem('ssg_customer_user', JSON.stringify(user));
     } else {
-      localStorage.removeItem('ssg_driver_user');
+      localStorage.removeItem('ssg_customer_user');
     }
   }, [user]);
 
-  const [isOnline, setIsOnline] = useState(() => {
-    const stored = localStorage.getItem('ssg_driver_online');
-    return stored !== 'false'; // defaults to true
-  });
-
   useEffect(() => {
-    localStorage.setItem('ssg_driver_online', isOnline);
-  }, [isOnline]);
-
-  const [showProfile, setShowProfile] = useState(false);
-
-  const [openRides, setOpenRides] = useState([]);
-
-  const prevOpenJobsLength = useRef(0);
-
-  useEffect(() => {
-    if (isOnline && openRides.length > prevOpenJobsLength.current) {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const playBeep = (time, freq, duration) => {
-          const osc = audioCtx.createOscillator();
-          const gain = audioCtx.createGain();
-          osc.connect(gain);
-          gain.connect(audioCtx.destination);
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq, time);
-          gain.gain.setValueAtTime(0, time);
-          gain.gain.linearRampToValueAtTime(0.08, time + 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-          osc.start(time);
-          osc.stop(time + duration);
-        };
-        const now = audioCtx.currentTime;
-        playBeep(now, 587.33, 0.18); // D5 note
-        playBeep(now + 0.12, 880, 0.25); // A5 note
-      } catch (err) {
-        console.error("Audio Context playback failed:", err);
-      }
-    }
-    prevOpenJobsLength.current = openRides.length;
-  }, [openRides, isOnline]);
-  const [myRides, setMyRides] = useState([]);
-  const [busyId, setBusyId] = useState(null);
-  const [toast, setToast] = useState('');
-
-  const [deliveryBlocked, setDeliveryBlocked] = useState(false);
-
-  const locateCustomer = (ride) => {
-    if (ride.customerLocation && ride.customerLocation.lat && ride.customerLocation.lng) {
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${ride.customerLocation.lat},${ride.customerLocation.lng}`, '_blank');
+    if (driverUser) {
+      localStorage.setItem('ssg_driver_user', JSON.stringify(driverUser));
     } else {
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(ride.pickupLocation)}`, '_blank');
+      localStorage.removeItem('ssg_driver_user');
     }
+  }, [driverUser]);
+
+  // booking form
+  const [pickup, setPickup] = useState('');
+  const [dropoff, setDropoff] = useState('');
+  const [vehicleType, setVehicleType] = useState('tempo');
+  const [trackedRideId, setTrackedRideId] = useState(null);
+  
+  // customer coordinates
+  const [customerLocation, setCustomerLocation] = useState(null);
+  const [fetchingGps, setFetchingGps] = useState(false);
+
+  const fetchGPSLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser.");
+      return;
+    }
+    setFetchingGps(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCustomerLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setFetchingGps(false);
+      },
+      (err) => {
+        alert(`Failed to get location: ${err.message}`);
+        setFetchingGps(false);
+      },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   };
 
-  const refresh = () => {
+  // quote step ("review before you book")
+  const [quote, setQuote] = useState(null);     // fare breakdown returned by /api/quote
+  const [quoting, setQuoting] = useState(false);
+  const [quoteError, setQuoteError] = useState('');
+
+  const [booking, setBooking] = useState(false);
+  const [bookError, setBookError] = useState('');
+
+  const [rides, setRides] = useState([]);
+  const [hoverRating, setHoverRating] = useState(0);
+
+  useEffect(() => {
+    fetch(`${API}/api/company`).then((r) => r.json()).then(setCompany).catch(() => {});
+  }, []);
+
+  const refreshRides = () => {
     if (!user) return;
-    if (isOnline) {
-      fetch(`${API}/api/rides?status=searching`).then((r) => r.json()).then(setOpenRides);
-    } else {
-      setOpenRides([]);
-    }
-    fetch(`${API}/api/rides?driverId=${user._id}`).then((r) => r.json()).then(setMyRides);
+    fetch(`${API}/api/rides?customerId=${user._id}`).then((r) => r.json()).then(setRides);
   };
 
   useEffect(() => {
     if (!user) return;
-    refresh();
-    const onUpdate = () => refresh();
+    refreshRides();
+    const onUpdate = (updated) => {
+      if (updated.customerId !== user._id) return;
+      setRides((prev) => {
+        const exists = prev.some((r) => r._id === updated._id);
+        return exists ? prev.map((r) => (r._id === updated._id ? updated : r)) : [updated, ...prev];
+      });
+    };
     socket.on('rideUpdated', onUpdate);
     return () => socket.off('rideUpdated', onUpdate);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, isOnline]);
+  }, [user]);
 
-  const activeRide = useMemo(
-    () => myRides.find((r) => !['delivered', 'cancelled'].includes(r.status)),
-    [myRides]
+  const activeRides = useMemo(
+    () => rides.filter((r) => !['delivered', 'cancelled'].includes(r.status)),
+    [rides]
   );
-  const completed = useMemo(() => myRides.filter((r) => r.status === 'delivered'), [myRides]);
-  const earnings = useMemo(() => completed.reduce((sum, r) => sum + (r.price || 0), 0), [completed]);
 
-  const acceptRide = async (id) => {
-    setBusyId(id);
-    setToast('');
+  const activeRide = useMemo(() => {
+    if (activeRides.length === 0) return null;
+    if (trackedRideId) {
+      const found = activeRides.find((r) => r._id === trackedRideId);
+      if (found) return found;
+    }
+    return activeRides[0];
+  }, [activeRides, trackedRideId]);
+
+  // Step 1 → 2: price the trip but don't book anything yet.
+  const getQuote = async () => {
+    setQuoteError(''); setBookError('');
+    if (!pickup || !dropoff) { setQuoteError('Enter both a pickup and a drop-off location.'); return; }
+    setQuoting(true);
     try {
-      const res = await fetch(`${API}/api/rides/${id}/accept`, {
-        method: 'PATCH',
+      const res = await fetch(`${API}/api/quote`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ driverId: user._id, driverName: user.name, driverVehicleNumber: user.vehicleNumber }),
+        body: JSON.stringify({ pickupLocation: pickup, dropoffLocation: dropoff, vehicleType }),
       });
       const data = await res.json();
-      if (!res.ok) { setToast(data.error || 'Could not accept this ride.'); refresh(); }
-      else refresh();
+      if (!res.ok) { setQuoteError(data.error || 'Could not price this trip.'); setQuoting(false); return; }
+      setQuote(data);
     } catch {
-      setToast('Could not reach the server.');
+      setQuoteError('Could not reach the server.');
     }
-    setBusyId(null);
+    setQuoting(false);
   };
 
-  const advance = async (ride) => {
-    const next = NEXT_STATUS[ride.status];
-    if (!next) return;
-    setBusyId(ride._id);
-    await fetch(`${API}/api/rides/${ride._id}`, {
+  const editTrip = () => { setQuote(null); setQuoteError(''); };
+
+  // Step 2 → 3: customer confirms the quoted fare, this actually creates the ride.
+  const confirmBooking = async () => {
+    setBookError('');
+    setBooking(true);
+    try {
+      const res = await fetch(`${API}/api/rides`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          pickupLocation: pickup,
+          dropoffLocation: dropoff,
+          vehicleType,
+          customerId: user._id,
+          customerName: user.name,
+          customerPhone: user.phone || '',
+          customerGSTIN: user.gstin || '',
+          customerLocation,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setBookError(data.error || 'Booking failed.'); setBooking(false); return; }
+      setRides((prev) => [data, ...prev]);
+      setTrackedRideId(data._id);
+      setPickup(''); setDropoff(''); setQuote(null); setCustomerLocation(null);
+    } catch {
+      setBookError('Could not reach the server.');
+    }
+    setBooking(false);
+  };
+
+  const cancelRide = async (id) => {
+    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+    try {
+      const res = await fetch(`${API}/api/rides/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'cancelled' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRides((prev) => prev.map((r) => (r._id === id ? data : r)));
+      } else {
+        alert("Failed to cancel the booking.");
+      }
+    } catch {
+      alert("Could not reach the server.");
+    }
+  };
+
+  const rateRide = async (id, rating) => {
+    const res = await fetch(`${API}/api/rides/${id}/rate`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: next }),
+      body: JSON.stringify({ rating }),
     });
-    setBusyId(null);
+    const data = await res.json();
+    setRides((prev) => prev.map((r) => (r._id === id ? data : r)));
   };
 
-  if (!user) return <AuthPage portal={PORTAL} onAuthSuccess={setUser} />;
+  const handleInvoice = (ride) => {
+    if (!company) return;
+    downloadInvoice(ride, company);
+  };
+
+  const history = useMemo(
+    () => rides.filter((r) => ['delivered', 'cancelled'].includes(r.status)),
+    [rides]
+  );
+
+  if (view === 'landing') {
+    return <LandingPage onSelectPortal={(selectedView) => setView(selectedView)} />;
+  }
+
+  if (view === 'driver') {
+    if (!driverUser) {
+      return (
+        <div className="theme-driver" style={{ minHeight: '100vh', background: 'var(--bg-void)' }}>
+          <AuthPage 
+            portal={DRIVER_PORTAL} 
+            onAuthSuccess={setDriverUser} 
+            onBackToHome={() => setView('landing')} 
+          />
+        </div>
+      );
+    }
+    return (
+      <DriverDashboard 
+        user={driverUser} 
+        setUser={setDriverUser} 
+        onBackToHome={() => setView('landing')} 
+      />
+    );
+  }
+
+  if (view === 'customer' && !user) {
+    return (
+      <div className="theme-customer" style={{ minHeight: '100vh', background: 'var(--bg-void)' }}>
+        <AuthPage 
+          portal={CUSTOMER_PORTAL} 
+          onAuthSuccess={setUser} 
+          onBackToHome={() => setView('landing')} 
+        />
+      </div>
+    );
+  }
+
+  const stepIndex = activeRide ? STEPS.indexOf(activeRide.status) : -1;
 
   return (
     <div className="dash">
-      <header className="dash-top" style={{ position: 'relative' }}>
-        <div className="dash-brand">
+      <header className="dash-top">
+        <div className="dash-brand" onClick={() => setView('landing')} style={{ cursor: 'pointer' }}>
           <span className="dash-brand-bolt" /> QUICKLOAD
-          <span className="dash-portal-tag">Driver</span>
+          <span className="dash-portal-tag">Customer</span>
         </div>
         <div className="dash-user">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginRight: '10px' }}>
-            <span style={{
-              width: '8px',
-              height: '8px',
-              borderRadius: '50%',
-              background: isOnline ? 'var(--accent)' : '#9ca3af',
-              boxShadow: isOnline ? '0 0 8px var(--accent-glow)' : 'none',
-              display: 'inline-block',
-              transition: 'all 0.2s'
-            }} />
-            <span style={{ fontSize: '13px', fontWeight: '600', color: isOnline ? 'var(--ink-100)' : 'var(--ink-400)' }}>
-              {isOnline ? 'Online' : 'Offline'}
-            </span>
-            <button
-              onClick={() => setIsOnline(!isOnline)}
-              style={{
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '20px',
-                padding: '4px',
-                lineHeight: 1,
-                display: 'flex',
-                alignItems: 'center'
-              }}
-              title={isOnline ? "Go Offline" : "Go Online"}
-            >
-              {isOnline ? '🟢' : '⚫'}
-            </button>
-          </div>
-          
-          <div 
-            onClick={() => setShowProfile(!showProfile)}
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              cursor: 'pointer', 
-              padding: '6px 12px', 
-              borderRadius: '8px', 
-              background: showProfile ? 'rgba(255,255,255,0.06)' : 'transparent',
-              transition: 'background 0.2s'
-            }}
-            onMouseEnter={(e) => { if(!showProfile) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
-            onMouseLeave={(e) => { if(!showProfile) e.currentTarget.style.background = 'transparent' }}
-          >
-            <span style={{ fontSize: '15px' }}>👤</span>
-            <span style={{ fontWeight: '500', color: 'var(--ink-100)' }}>{user.name}</span>
-            <span style={{ fontSize: '10px', transition: 'transform 0.2s', transform: showProfile ? 'rotate(180deg)' : 'rotate(0deg)', color: 'var(--ink-400)' }}>▼</span>
-          </div>
+          <span>{user.name}</span>
+          <button className="ghost-btn" onClick={() => setUser(null)}>Logout</button>
         </div>
-
-        <AnimatePresence>
-          {showProfile && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-              style={{
-                position: 'absolute',
-                top: '100%',
-                right: '40px',
-                width: '320px',
-                background: 'rgba(13, 23, 38, 0.95)',
-                backdropFilter: 'blur(16px)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderTop: 'none',
-                borderRadius: '0 0 16px 16px',
-                boxShadow: '0 16px 40px rgba(0, 0, 0, 0.5), 0 0 20px var(--accent-glow)',
-                padding: '24px',
-                zIndex: 99,
-                color: 'var(--ink-100)',
-                textAlign: 'left'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '18px' }}>
-                <div style={{
-                  width: '44px',
-                  height: '44px',
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, var(--accent), var(--accent-deep))',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '18px',
-                  color: 'var(--ink-on-accent)',
-                  fontWeight: 'bold'
-                }}>
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '15px', fontWeight: '600' }}>{user.name}</h3>
-                  <span style={{ fontSize: '11px', color: 'var(--accent)', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Driver Partner</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', borderTop: '1px solid var(--line)', paddingTop: '14px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--ink-400)' }}>Email</span>
-                  <span style={{ fontWeight: '500' }}>{user.email}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--ink-400)' }}>Phone</span>
-                  <span style={{ fontWeight: '500' }}>{user.phone || 'Not provided'}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--ink-400)' }}>Vehicle Type</span>
-                  <span style={{ fontWeight: '500', textTransform: 'capitalize' }}>{user.vehicleType}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--ink-400)' }}>License Plate</span>
-                  <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>{user.vehicleNumber || 'None'}</span>
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--line)', borderRadius: '10px', padding: '12px', marginBottom: '18px', textAlign: 'center' }}>
-                <div>
-                  <span style={{ display: 'block', fontSize: '10px', color: 'var(--ink-400)', marginBottom: '4px', textTransform: 'uppercase' }}>Trips Completed</span>
-                  <strong style={{ fontSize: '15px', color: 'var(--ink-100)' }}>{completed.length}</strong>
-                </div>
-                <div>
-                  <span style={{ display: 'block', fontSize: '10px', color: 'var(--ink-400)', marginBottom: '4px', textTransform: 'uppercase' }}>Total Earnings</span>
-                  <strong style={{ fontSize: '15px', color: 'var(--accent)' }}>₹{earnings.toFixed(0)}</strong>
-                </div>
-              </div>
-
-              <button
-                className="ghost-btn"
-                onClick={() => setUser(null)}
-                style={{ width: '100%', borderColor: 'rgba(239, 68, 68, 0.4)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 16px', borderRadius: '8px', fontSize: '13px' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                  e.currentTarget.style.borderColor = 'var(--danger)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.4)';
-                }}
-              >
-                🚪 Logout Partner
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </header>
 
-      <main className="dash-main driver-grid">
-        <motion.section className="card earnings-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>
-          <h2>Earnings</h2>
-          <div className="earnings-amount">₹{earnings.toFixed(0)}</div>
-          <p className="card-sub">{completed.length} completed {completed.length === 1 ? 'trip' : 'trips'}</p>
+      <main className="dash-main">
+        <motion.section className="card book-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }}>
+          <AnimatePresence mode="wait">
+            {!quote ? (
+              <motion.div key="form" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <h2>Book a Truck</h2>
+                <p className="card-sub">Get an itemised, GST-inclusive fare before you commit — nothing books until you confirm.</p>
+ 
+                <label className="field"><span>Pickup</span>
+                  <input value={pickup} onChange={(e) => setPickup(e.target.value)} placeholder="e.g. Latur, Maharashtra" />
+                </label>
+                <label className="field"><span>Drop-off</span>
+                  <input value={dropoff} onChange={(e) => setDropoff(e.target.value)} placeholder="e.g. Pune, Maharashtra" />
+                </label>
+
+                <div className="gps-section">
+                  <button
+                    type="button"
+                    className={`gps-btn ${customerLocation ? 'active' : ''}`}
+                    onClick={fetchGPSLocation}
+                    disabled={fetchingGps}
+                  >
+                    {fetchingGps ? '🛰️ Pinpointing Location…' : customerLocation ? `📍 GPS Shared (${customerLocation.lat.toFixed(4)}, ${customerLocation.lng.toFixed(4)})` : '📍 Share Precise GPS for Driver'}
+                  </button>
+                  {customerLocation && (
+                    <button type="button" className="gps-clear-btn" onClick={() => setCustomerLocation(null)}>✕ Remove</button>
+                  )}
+                </div>
+
+                <div className="field">
+                  <span>Select Vehicle Type</span>
+                  <div className="vehicle-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginTop: '8px' }}>
+                    {[
+                      { type: 'tempo', label: 'Tempo', desc: 'Light Goods', rate: '₹18/km', icon: '🚚' },
+                      { type: 'minitruck', label: 'Mini Truck', desc: 'Medium Cargo', rate: '₹26/km', icon: '🚛' },
+                      { type: 'trailer', label: 'Heavy Trailer', desc: 'Large Freight', rate: '₹38/km', icon: '🏗️' }
+                    ].map((v) => (
+                      <div
+                        key={v.type}
+                        className={`vehicle-card ${vehicleType === v.type ? 'active' : ''}`}
+                        onClick={() => setVehicleType(v.type)}
+                        style={{
+                          background: vehicleType === v.type ? 'rgba(22, 38, 59, 0.5)' : 'rgba(6, 10, 18, 0.4)',
+                          border: vehicleType === v.type ? '2px solid var(--accent)' : '1px solid var(--line)',
+                          borderRadius: '12px',
+                          padding: '14px 10px',
+                          textAlign: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                          boxShadow: vehicleType === v.type ? '0 0 16px var(--accent-glow)' : 'none',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (vehicleType !== v.type) {
+                            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)';
+                            e.currentTarget.style.background = 'rgba(6, 10, 18, 0.6)';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (vehicleType !== v.type) {
+                            e.currentTarget.style.borderColor = 'var(--line)';
+                            e.currentTarget.style.background = 'rgba(6, 10, 18, 0.4)';
+                          }
+                        }}
+                      >
+                        <div style={{ fontSize: '24px', marginBottom: '8px' }}>{v.icon}</div>
+                        <strong style={{ display: 'block', fontSize: '13.5px', color: 'var(--ink-100)', marginBottom: '2px' }}>{v.label}</strong>
+                        <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '4px' }}>{v.desc}</span>
+                        <span style={{ display: 'inline-block', fontSize: '11.5px', color: 'var(--accent)', fontWeight: '600', background: 'rgba(37, 99, 235, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>{v.rate}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {quoteError && <div className="inline-error">{quoteError}</div>}
+
+                <button className="primary-btn" onClick={getQuote} disabled={quoting}>
+                  {quoting ? 'Pricing your trip…' : 'Get Fare Quote'}
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div key="quote" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <h2>Review &amp; Confirm</h2>
+                <p className="card-sub">This fare is locked in for the next few minutes. Confirm to find a driver.</p>
+
+                <div className="route-line" style={{ marginBottom: 16 }}>
+                  <strong>{pickup}</strong>
+                  <span className="route-arrow">→</span>
+                  <strong>{dropoff}</strong>
+                </div>
+
+                <ul className="quote-breakdown">
+                  <li><span>Base fare</span><span>₹{quote.baseFare.toFixed(2)}</span></li>
+                  <li><span>Distance charge ({quote.distance} km)</span><span>₹{quote.distanceFare.toFixed(2)}</span></li>
+                  {quote.rainSurcharge > 0 && (
+                    <li className="surcharge"><span>🌧️ Rain surcharge</span><span>₹{quote.rainSurcharge.toFixed(2)}</span></li>
+                  )}
+                  {quote.rushHourSurcharge > 0 && (
+                    <li className="surcharge"><span>⏱️ Peak-hour surcharge</span><span>₹{quote.rushHourSurcharge.toFixed(2)}</span></li>
+                  )}
+                  <li className="subtotal"><span>Subtotal</span><span>₹{quote.subtotal.toFixed(2)}</span></li>
+                  <li><span>IGST ({quote.taxRate}%)</span><span>₹{quote.taxAmount.toFixed(2)}</span></li>
+                  <li className="grand-total"><span>Total payable</span><span>₹{quote.price.toFixed(2)}</span></li>
+                </ul>
+
+                {bookError && <div className="inline-error">{bookError}</div>}
+
+                <div className="quote-actions">
+                  <button className="ghost-btn" onClick={editTrip} disabled={booking}>Edit Trip</button>
+                  <button className="primary-btn" onClick={confirmBooking} disabled={booking}>
+                    {booking ? 'Booking…' : `Confirm & Find Driver · ${VEHICLE_LABEL[vehicleType]}`}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.section>
 
-        <motion.section className="card active-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
-          <h2>Active Trip</h2>
+        <motion.section className="card track-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+            <h2 style={{ margin: 0 }}>Live Tracking</h2>
+            {activeRides.length > 1 && (
+              <select
+                className="active-ride-select"
+                value={activeRide?._id || ''}
+                onChange={(e) => setTrackedRideId(e.target.value)}
+              >
+                {activeRides.map((r, i) => (
+                  <option key={r._id} value={r._id}>
+                    Truck #{i + 1}: {r.pickupLocation.split(',')[0]} → {r.dropoffLocation.split(',')[0]} ({STEP_LABEL[r.status] || r.status})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
           <AnimatePresence mode="wait">
             {!activeRide ? (
-              <motion.p key="empty" className="card-sub" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                Accept an open job below to get started.
-              </motion.p>
+              <motion.div key="empty" className="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <p>No active shipment yet. Book a ride and it'll show up here, live.</p>
+              </motion.div>
             ) : (
               <motion.div key={activeRide._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <div className="route-line">
@@ -335,183 +446,126 @@ export default function App() {
                   <span className="route-arrow">→</span>
                   <strong>{activeRide.dropoffLocation}</strong>
                 </div>
-                <div className="fare-row">
-                  <div><span className="muted">Vehicle Type</span><strong style={{ textTransform: 'capitalize' }}>{activeRide.vehicleType}</strong></div>
-                  <div><span className="muted">Distance</span><strong>{activeRide.distance} km</strong></div>
-                  <div><span className="muted">Fare (incl. GST)</span><strong>₹{activeRide.price}</strong></div>
-                </div>
 
-                <div className="driver-info-panel" style={{ background: 'rgba(6, 10, 18, 0.4)', border: '1px solid var(--line)', padding: '16px 20px', borderRadius: '12px', marginBottom: '24px' }}>
-                  <h3 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--ink-400)', letterSpacing: '0.05em', marginTop: 0, marginBottom: '10px', fontWeight: 600 }}>Customer Details</h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 15px' }}>
-                    <div>
-                      <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>Name</span>
-                      <strong>{activeRide.customerName}</strong>
-                    </div>
-                    {activeRide.customerPhone && (
+                <ol className="timeline">
+                  {STEPS.map((step, i) => {
+                    const isDone = i < stepIndex;
+                    const isActive = i === stepIndex;
+                    return (
+                      <li key={step} className={`${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}>
+                        <span className="dot">
+                          {isDone && <span style={{ fontSize: '9px', fontWeight: 'bold', display: 'block', transform: 'translateY(-1px)' }}>✓</span>}
+                        </span>
+                        {STEP_LABEL[step]}
+                      </li>
+                    );
+                  })}
+                </ol>
+
+                {activeRide.driverName && (
+                  <div className="assigned-driver-card" style={{ background: 'rgba(22, 38, 59, 0.4)', border: '1px solid var(--line)', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                    <h3 style={{ fontSize: '12px', textTransform: 'uppercase', color: 'var(--ink-400)', letterSpacing: '0.05em', marginTop: 0, marginBottom: '10px', fontWeight: 600 }}>Assigned Driver & Vehicle</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px 15px' }}>
                       <div>
-                        <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>Phone</span>
-                        <strong><a href={`tel:${activeRide.customerPhone}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{activeRide.customerPhone}</a></strong>
+                        <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>Driver Name</span>
+                        <strong>{activeRide.driverName}</strong>
                       </div>
-                    )}
-                    {activeRide.customerGSTIN && (
-                      <div style={{ gridColumn: '1 / -1' }}>
-                        <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>GSTIN</span>
-                        <strong style={{ fontSize: '13px', fontFamily: 'var(--font-mono)' }}>{activeRide.customerGSTIN}</strong>
+                      {activeRide.driverPhone && (
+                        <div>
+                          <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>Phone</span>
+                          <strong><a href={`tel:${activeRide.driverPhone}`} style={{ color: 'var(--accent)', textDecoration: 'none' }}>{activeRide.driverPhone}</a></strong>
+                        </div>
+                      )}
+                      <div>
+                        <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>Truck Type</span>
+                        <strong>{VEHICLE_LABEL[activeRide.vehicleType] || activeRide.vehicleType}</strong>
                       </div>
-                    )}
-                    <div style={{ gridColumn: '1 / -1', borderTop: '1px dashed var(--line)', paddingTop: '10px', marginTop: '4px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ maxWidth: '60%' }}>
-                        <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>Pickup Point</span>
-                        <strong style={{ fontSize: '12px', lineHeight: '1.3', display: 'block' }}>{activeRide.pickupLocation}</strong>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => locateCustomer(activeRide)}
-                        style={{
-                          background: 'rgba(37, 99, 235, 0.12)',
-                          border: '1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-                          color: 'var(--accent)',
-                          borderRadius: '8px',
-                          padding: '6px 12px',
-                          fontSize: '11.5px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.25)'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(37, 99, 235, 0.12)'}
-                      >
-                        🗺️ Nav Route
-                      </button>
+                      {activeRide.driverVehicleNumber && (
+                        <div>
+                          <span style={{ display: 'block', fontSize: '11px', color: 'var(--ink-400)', marginBottom: '2px' }}>Truck Number</span>
+                          <strong style={{ fontFamily: 'var(--font-mono)' }}>{activeRide.driverVehicleNumber}</strong>
+                        </div>
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
 
-                <DriverGPSTracker ride={activeRide} onGeofenceBlock={setDeliveryBlocked} />
+                {activeRide.status === 'searching' && (
+                  <button
+                    type="button"
+                    onClick={() => cancelRide(activeRide._id)}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '10px',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      color: 'var(--danger)',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      marginBottom: '16px',
+                      transition: 'all 0.2s ease-in-out'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'rgba(239, 68, 68, 0.2)';
+                      e.target.style.borderColor = 'var(--danger)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.target.style.borderColor = 'rgba(239, 68, 68, 0.4)';
+                    }}
+                  >
+                    🚫 Cancel Booking
+                  </button>
+                )}
 
-                <div className="driver-actions" style={{ marginTop: '20px' }}>
-                  {NEXT_STATUS[activeRide.status] ? (
-                    <div style={{ width: '100%' }}>
-                      <div className="swipe-confirm-container" style={{
-                        background: 'rgba(6, 10, 18, 0.6)',
-                        border: '1px solid var(--line)',
-                        borderRadius: '50px',
-                        height: '56px',
-                        position: 'relative',
-                        display: 'flex',
-                        alignItems: 'center',
-                        padding: '4px',
-                        overflow: 'hidden',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        marginBottom: '16px'
-                      }}>
-                        <motion.div
-                          drag={busyId === activeRide._id || (activeRide.status === 'in-transit' && deliveryBlocked) ? false : "x"}
-                          dragConstraints={{ left: 0, right: 200 }}
-                          dragElastic={0}
-                          dragMomentum={false}
-                          onDragEnd={(event, info) => {
-                            if (info.offset.x >= 170) {
-                              advance(activeRide);
-                            }
-                          }}
-                          style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, var(--accent), var(--accent-deep))',
-                            boxShadow: '0 0 12px var(--accent-glow)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: (activeRide.status === 'in-transit' && deliveryBlocked) ? 'not-allowed' : 'grab',
-                            zIndex: 10,
-                          }}
-                          animate={{ x: 0 }}
-                          transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                          whileTap={{ cursor: (activeRide.status === 'in-transit' && deliveryBlocked) ? 'not-allowed' : 'grabbing' }}
-                        >
-                          <span style={{ fontSize: '18px', color: 'var(--ink-on-accent)', userSelect: 'none', fontWeight: 'bold' }}>→</span>
-                        </motion.div>
-                        <div style={{
-                          position: 'absolute',
-                          width: '100%',
-                          textAlign: 'center',
-                          color: (activeRide.status === 'in-transit' && deliveryBlocked) ? 'var(--danger)' : 'var(--ink-400)',
-                          fontSize: '13px',
-                          fontWeight: '600',
-                          pointerEvents: 'none',
-                          userSelect: 'none',
-                          zIndex: 1,
-                          paddingRight: '48px',
-                          boxSizing: 'border-box'
-                        }}>
-                          {busyId === activeRide._id
-                            ? 'Updating status…'
-                            : (activeRide.status === 'in-transit' && deliveryBlocked)
-                              ? '🔒 Locked: Must enter geofence area'
-                              : `Swipe to ${NEXT_LABEL[activeRide.status]}`}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="inline-success" style={{ width: '100%', textAlign: 'center', padding: '12px' }}>Trip complete — nice work!</div>
-                  )}
+                <CustomerLiveMap ride={activeRide} />
+
+                <div className="fare-row">
+                  <div><span className="muted">Distance</span><strong>{activeRide.distance} km</strong></div>
+                  <div><span className="muted">Total (incl. GST)</span><strong>₹{activeRide.price}</strong></div>
+                  {activeRide.isRaining && <div className="rain-badge">🌧️ Rain surcharge applied</div>}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </motion.section>
 
-        <motion.section className="card open-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-          <h2>Open Jobs Nearby</h2>
-          {!isOnline ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{ fontSize: '40px' }}>💤</div>
-              <h3 style={{ margin: 0, fontSize: '16px', color: 'var(--ink-200)' }}>You are currently offline</h3>
-              <p style={{ margin: 0, fontSize: '13px', color: 'var(--ink-400)', maxWidth: '280px', lineHeight: 1.5 }}>
-                Toggle your status to online in the top bar to start receiving incoming logistics dispatch orders near you.
-              </p>
-              <button
-                type="button"
-                className="primary-btn"
-                onClick={() => setIsOnline(true)}
-                style={{ width: 'auto', padding: '8px 20px', marginTop: '8px', fontSize: '13.5px' }}
-              >
-                Go Online
-              </button>
-            </div>
-          ) : (
-            <>
-              {toast && <div className="inline-error">{toast}</div>}
-              {openRides.length === 0 && <p className="card-sub">No open jobs right now — check back shortly.</p>}
-              <ul className="job-list">
-                {openRides.map((r) => (
-                  <li key={r._id} className="job-item">
-                    <div>
-                      <strong>{r.pickupLocation} → {r.dropoffLocation}</strong>
-                      <div className="muted small">{r.vehicleType} · {r.distance} km{r.isRaining ? ' · 🌧️ rain surcharge' : ''}</div>
+        <motion.section className="card history-card" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <h2>Ride History</h2>
+          {history.length === 0 && <p className="card-sub">Completed rides will appear here.</p>}
+          <ul className="history-list">
+            {history.map((r) => (
+              <li key={r._id} className="history-item">
+                <div>
+                  <strong>{r.pickupLocation} → {r.dropoffLocation}</strong>
+                  <div className="muted small">
+                    {new Date(r.createdAt).toLocaleDateString()} · ₹{r.price} (incl. GST) · {VEHICLE_LABEL[r.vehicleType] || r.vehicleType}
+                    {r.invoiceNumber && <> · {r.invoiceNumber}</>}
+                  </div>
+                </div>
+                <div className="history-actions">
+                  {r.status === 'delivered' && !r.rating && (
+                    <div className="stars" onMouseLeave={() => setHoverRating(0)}>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <span
+                          key={n}
+                          className={n <= hoverRating ? 'on' : ''}
+                          onMouseEnter={() => setHoverRating(n)}
+                          onClick={() => rateRide(r._id, n)}
+                        >★</span>
+                      ))}
                     </div>
-                    <div className="job-actions">
-                      <span className="job-fare">₹{r.price} <em>incl. GST</em></span>
-                      <button
-                        className="primary-btn small"
-                        disabled={!!activeRide || busyId === r._id}
-                        onClick={() => acceptRide(r._id)}
-                      >
-                        {busyId === r._id ? 'Accepting…' : 'Accept'}
-                      </button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+                  )}
+                  {r.rating && <div className="rated">{'★'.repeat(r.rating)}</div>}
+                  {r.status === 'delivered' && (
+                    <button className="ghost-btn small" onClick={() => handleInvoice(r)} disabled={!company}>Invoice</button>
+                  )}
+                  {r.status === 'cancelled' && <span className="cancelled-tag">Cancelled</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
         </motion.section>
       </main>
     </div>

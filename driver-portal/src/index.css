@@ -1,5 +1,5 @@
 :root {
-  /* ---- surfaces (shared with customer portal) ---- */
+  /* ---- surfaces ---- */
   --bg-void: #060a12;
   --bg-panel: #0d1726;
   --bg-panel-2: #111f33;
@@ -7,15 +7,15 @@
   --line: rgba(255, 255, 255, 0.08);
 
   /* ---- ink ---- */
-  --ink-100: #faf3ea;
-  --ink-400: #8a8276;
-  --ink-500: #564f44;
-  --ink-on-accent: #1a0f02;
+  --ink-100: #eaf6f6;
+  --ink-400: #6e8898;
+  --ink-500: #46586a;
+  --ink-on-accent: #03161a;
 
-  /* ---- accent: amber (driver portal) ---- */
-  --accent: #ffb84d;
-  --accent-deep: #b5722a;
-  --accent-glow: rgba(255, 184, 77, 0.45);
+  /* ---- default accent: teal (customer) ---- */
+  --accent: #1fd8d8;
+  --accent-deep: #0b7a86;
+  --accent-glow: rgba(31, 216, 216, 0.45);
 
   /* ---- status ---- */
   --success: #34d399;
@@ -29,6 +29,20 @@
 
   color-scheme: dark;
   background: var(--bg-void);
+}
+
+.theme-customer {
+  --accent: #1fd8d8;
+  --accent-deep: #0b7a86;
+  --accent-glow: rgba(31, 216, 216, 0.45);
+  --ink-on-accent: #03161a;
+}
+
+.theme-driver {
+  --accent: #f59e0b;
+  --accent-deep: #b45309;
+  --accent-glow: rgba(245, 158, 11, 0.45);
+  --ink-on-accent: #1e1b4b;
 }
 
 * { box-sizing: border-box; }

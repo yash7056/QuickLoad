@@ -1,15 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import './AuthPage.css';
 
 /**
- * Shared diagonal-glow auth screen used by both the Customer and Driver portals.
- * Visual identity (accent color, copy, fields) is driven entirely by props so the
- * same component can power two differently-branded apps.
+ * AuthPage.jsx
  *
  * portal: { key: 'customer' | 'driver', label, tagline, loginWelcome, registerWelcome, apiBase }
  */
-export default function AuthPage({ portal, onAuthSuccess }) {
+export default function AuthPage({ portal, onAuthSuccess, onBackToHome }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [form, setForm] = useState({ name: '', email: '', password: '', phone: '', gstin: '', vehicleType: 'tempo', vehicleNumber: '' });
   const [error, setError] = useState('');
@@ -89,7 +86,7 @@ export default function AuthPage({ portal, onAuthSuccess }) {
           transition={{ type: 'spring', stiffness: 130, damping: 20 }}
         >
           <div className="auth-brand-inner">
-            <div className="brand-mark">
+            <div className="brand-mark" onClick={onBackToHome} style={{ cursor: onBackToHome ? 'pointer' : 'default' }} title={onBackToHome ? "Back to Homepage" : ""}>
               <span className="brand-mark-bolt" />
               <span>QUICKLOAD</span>
             </div>
@@ -205,6 +202,31 @@ export default function AuthPage({ portal, onAuthSuccess }) {
                   {isLogin ? 'Sign Up' : 'Sign In'}
                 </button>
               </p>
+
+              {onBackToHome && (
+                <button 
+                  type="button" 
+                  onClick={onBackToHome}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--ink-400)',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    marginTop: '16px',
+                    textDecoration: 'underline',
+                    textAlign: 'center',
+                    transition: 'color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = 'var(--ink-100)'}
+                  onMouseLeave={(e) => e.target.style.color = 'var(--ink-400)'}
+                >
+                  ← Back to Homepage
+                </button>
+              )}
             </motion.form>
           </AnimatePresence>
         </div>

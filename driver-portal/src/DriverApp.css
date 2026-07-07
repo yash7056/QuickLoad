@@ -1,0 +1,376 @@
+/* App-level styles for the Driver Portal dashboard.
+   Auth screen styling lives in AuthPage.css; design tokens in index.css. */
+
+.dash {
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 60% 40% at 80% -10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 60%),
+    var(--bg-void);
+  font-family: var(--font-body);
+}
+
+.dash-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 40px;
+  background: rgba(6, 10, 18, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.dash-brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-100);
+}
+
+.dash-brand-bolt {
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  clip-path: polygon(40% 0, 100% 0, 60% 100%, 0 100%);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.dash-portal-tag {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.dash-user {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: var(--ink-400);
+  font-size: 14px;
+}
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink-400);
+  padding: 9px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ghost-btn:hover {
+  border-color: var(--accent);
+  color: var(--ink-100);
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.ghost-btn.small {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.dash-main {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr;
+  gap: 28px;
+  padding: 40px 40px 80px;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.card {
+  background: rgba(13, 23, 38, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 30px 32px;
+  box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.3);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 48px 0 rgba(0, 0, 0, 0.4);
+}
+
+.card h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--ink-100);
+  letter-spacing: -0.01em;
+}
+
+.card-sub {
+  color: var(--ink-400);
+  font-size: 13.5px;
+  margin: 0 0 22px;
+  line-height: 1.5;
+}
+
+.earnings-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.earnings-card::after {
+  content: '';
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  width: 140px;
+  height: 140px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.earnings-amount {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 700;
+  color: var(--accent);
+  margin: 10px 0 4px;
+  letter-spacing: -0.02em;
+}
+
+.active-card {
+  grid-column: 1 / -1;
+}
+
+.route-line {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink-100);
+  font-size: 18px;
+  margin-bottom: 22px;
+  font-weight: 600;
+}
+
+.route-arrow {
+  color: var(--accent);
+  font-size: 20px;
+}
+
+.fare-row {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  background: rgba(6, 10, 18, 0.4);
+  border: 1px solid var(--line);
+  padding: 18px 24px;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.fare-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fare-row .muted {
+  color: var(--ink-400);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.fare-row strong {
+  color: var(--ink-100);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 11px;
+  border: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  color: var(--ink-on-accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px -6px var(--accent-glow);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.primary-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px -4px var(--accent-glow);
+}
+
+.primary-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.primary-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  box-shadow: none;
+}
+
+.inline-success {
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--success) 40%, transparent);
+  color: var(--success);
+  font-size: 14.5px;
+  font-weight: 600;
+  padding: 14px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.inline-error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  color: var(--danger);
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.open-card {
+  grid-column: 1 / -1;
+}
+
+.job-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.job-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(17, 31, 51, 0.35);
+  border: 1px solid var(--line);
+  padding: 18px 24px;
+  border-radius: 14px;
+  transition: all 0.25s ease;
+}
+
+.job-item:hover {
+  background: rgba(17, 31, 51, 0.6);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
+}
+
+.job-item strong {
+  font-size: 16px;
+  color: var(--ink-100);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.job-item .muted {
+  color: var(--ink-400);
+}
+
+.job-item .small {
+  font-size: 13px;
+}
+
+.job-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.job-fare {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.job-fare strong {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 2px;
+}
+
+.job-fare em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--ink-400);
+  text-transform: uppercase;
+}
+
+.primary-btn.small {
+  width: auto;
+  padding: 9px 20px;
+  font-size: 13.5px;
+  border-radius: 8px;
+}
+
+.driver-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.driver-actions .primary-btn {
+  flex: 1.5;
+}
+
+.driver-actions .ghost-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 11px;
+  font-size: 14.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .dash-main {
+    grid-template-columns: 1fr;
+    padding: 24px 20px 60px;
+    gap: 20px;
+  }
+  .dash-top {
+    padding: 16px 20px;
+  }
+  .job-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .job-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

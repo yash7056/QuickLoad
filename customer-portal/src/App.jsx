@@ -255,11 +255,13 @@ export default function App() {
   if (view === 'driver') {
     if (!driverUser) {
       return (
-        <AuthPage 
-          portal={DRIVER_PORTAL} 
-          onAuthSuccess={setDriverUser} 
-          onBackToHome={() => setView('landing')} 
-        />
+        <div className="theme-driver" style={{ minHeight: '100vh', background: 'var(--bg-void)' }}>
+          <AuthPage 
+            portal={DRIVER_PORTAL} 
+            onAuthSuccess={setDriverUser} 
+            onBackToHome={() => setView('landing')} 
+          />
+        </div>
       );
     }
     return (
@@ -273,11 +275,13 @@ export default function App() {
 
   if (view === 'customer' && !user) {
     return (
-      <AuthPage 
-        portal={CUSTOMER_PORTAL} 
-        onAuthSuccess={setUser} 
-        onBackToHome={() => setView('landing')} 
-      />
+      <div className="theme-customer" style={{ minHeight: '100vh', background: 'var(--bg-void)' }}>
+        <AuthPage 
+          portal={CUSTOMER_PORTAL} 
+          onAuthSuccess={setUser} 
+          onBackToHome={() => setView('landing')} 
+        />
+      </div>
     );
   }
 

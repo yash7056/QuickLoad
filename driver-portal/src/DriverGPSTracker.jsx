@@ -317,4 +317,3 @@ export default function DriverGPSTracker({ ride, onGeofenceBlock }) {
         </div>
     );
 }
-
