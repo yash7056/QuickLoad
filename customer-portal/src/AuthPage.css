@@ -35,13 +35,15 @@
   width: 100%;
   max-width: 880px;
   height: 540px;
-  background: var(--bg-panel);
+  background: rgba(13, 23, 38, 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-radius: 22px;
   overflow: hidden;
   box-shadow:
-    0 0 0 1px var(--line),
-    0 30px 80px -20px rgba(0, 0, 0, 0.7),
-    0 0 120px -40px var(--accent-glow);
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 30px 80px -20px rgba(0, 0, 0, 0.8),
+    0 0 120px -30px var(--accent-glow);
 }
 
 /* the glowing diagonal brand panel, absolutely positioned and
@@ -275,37 +277,37 @@
 .auth-blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.18;
+  filter: blur(140px);
+  opacity: 0.35;
   mix-blend-mode: screen;
 }
 
 .blob-1 {
-  width: 300px;
-  height: 300px;
+  width: 450px;
+  height: 450px;
   background: var(--accent);
-  top: -50px;
-  left: -50px;
+  top: -100px;
+  left: -100px;
   animation: float-blob-1 25s infinite alternate ease-in-out;
 }
 
 .blob-2 {
-  width: 350px;
-  height: 350px;
+  width: 500px;
+  height: 500px;
   background: var(--accent-deep);
-  bottom: -80px;
-  right: -50px;
+  bottom: -120px;
+  right: -100px;
   animation: float-blob-2 30s infinite alternate ease-in-out;
 }
 
 .blob-3 {
-  width: 250px;
-  height: 250px;
+  width: 350px;
+  height: 350px;
   background: var(--warning);
-  top: 40%;
-  left: 30%;
+  top: 30%;
+  left: 20%;
   animation: float-blob-3 20s infinite alternate ease-in-out;
-  opacity: 0.08;
+  opacity: 0.16;
 }
 
 @keyframes float-blob-1 {
