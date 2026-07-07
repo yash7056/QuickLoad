@@ -13,6 +13,7 @@ export default function LandingPage({ onSelectPortal }) {
   const [quote, setQuote] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('shipper'); // 'shipper' | 'driver'
 
   const handleGetQuote = async (e) => {
     e.preventDefault();
@@ -49,6 +50,7 @@ export default function LandingPage({ onSelectPortal }) {
       <div className="landing-blobs">
         <div className="landing-blob blob-teal" />
         <div className="landing-blob blob-amber" />
+        <div className="landing-blob blob-center" />
       </div>
       <div className="landing-grid" />
 
@@ -58,6 +60,9 @@ export default function LandingPage({ onSelectPortal }) {
           <span className="landing-brand-bolt" /> QUICKLOAD
         </div>
         <div className="landing-header-actions">
+          <button className="nav-link" onClick={() => document.getElementById('concept').scrollIntoView({ behavior: 'smooth' })}>
+            How it Works
+          </button>
           <button className="nav-link" onClick={() => document.getElementById('prototype').scrollIntoView({ behavior: 'smooth' })}>
             Try Quote Prototype
           </button>
@@ -71,12 +76,16 @@ export default function LandingPage({ onSelectPortal }) {
       <main className="landing-main">
         {/* Hero Section */}
         <section className="landing-hero">
+          <div className="badge-wrapper">
+            <span className="premium-badge">🚚 Double-Sided Freight Marketplace</span>
+          </div>
           <motion.h1 
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            Smart Freight. Real-Time Tracking. <span className="gradient-text">Dynamic AI Pricing.</span>
+            Instantly Book Freight. <br />
+            <span className="gradient-text">Haul Cargo with AI-Driven Rates.</span>
           </motion.h1>
           <motion.p 
             className="hero-subtitle"
@@ -84,7 +93,7 @@ export default function LandingPage({ onSelectPortal }) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.15 }}
           >
-            QuickLoad is a premium, double-sided cargo booking platform connecting shippers with freight drivers instantly. Price jobs dynamically using distance and weather variables, and watch cargo move on Leaflet maps.
+            QuickLoad connects shippers and commercial truck drivers in real time. We replace static rates with dynamic, AI-modeled fare quotes adjusted instantly for route distance and weather conditions.
           </motion.p>
 
           {/* Unified Gateways CTAs */}
@@ -95,26 +104,123 @@ export default function LandingPage({ onSelectPortal }) {
             transition={{ duration: 0.6, delay: 0.3 }}
           >
             <div className="gateway-card customer-gate" onClick={() => onSelectPortal('customer')}>
-              <div className="gate-icon">🟢</div>
+              <div className="gate-glow-border" />
+              <div className="gate-header">
+                <span className="gate-icon">🟢</span>
+                <span className="gate-tag">For Cargo Shippers</span>
+              </div>
               <h3>Ship Cargo</h3>
-              <p>Book trucks, get instant invoices, rate drivers, and track cargo live.</p>
+              <p>Book utility vehicles instantly, get live GPS delivery maps, and automatically download legal GST-compliant invoices.</p>
               <button className="gate-btn">Enter Customer Portal →</button>
             </div>
 
             <div className="gateway-card driver-gate" onClick={() => onSelectPortal('driver')}>
-              <div className="gate-icon">🟡</div>
+              <div className="gate-glow-border" />
+              <div className="gate-header">
+                <span className="gate-icon">🟡</span>
+                <span className="gate-tag">For Truck Drivers</span>
+              </div>
               <h3>Become a Driver</h3>
-              <p>Find matches, accept hauling jobs, view live navigation, and track your payouts.</p>
+              <p>Match with bookings that fit your vehicle class, follow live turn-by-turn navigation, and view your payout earnings log.</p>
               <button className="gate-btn">Enter Driver Portal →</button>
             </div>
           </motion.div>
         </section>
 
+        {/* Conceptual How it Works Timeline */}
+        <section id="concept" className="landing-section concept-section">
+          <div className="section-header">
+            <h2>Understanding the Concept</h2>
+            <p>Here is how our two-sided marketplace coordinates cargo bookings in four steps.</p>
+          </div>
+
+          <div className="tab-switcher">
+            <button 
+              className={`tab-btn ${activeTab === 'shipper' ? 'active-shipper' : ''}`}
+              onClick={() => setActiveTab('shipper')}
+            >
+              For Cargo Shippers
+            </button>
+            <button 
+              className={`tab-btn ${activeTab === 'driver' ? 'active-driver' : ''}`}
+              onClick={() => setActiveTab('driver')}
+            >
+              For Truck Drivers
+            </button>
+          </div>
+
+          <div className="concept-timeline-wrapper">
+            <AnimatePresence mode="wait">
+              {activeTab === 'shipper' ? (
+                <motion.div 
+                  key="shipper-steps"
+                  className="steps-grid"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="step-card">
+                    <span className="step-num">01</span>
+                    <h4>Get AI Quote</h4>
+                    <p>Enter details and get guaranteed rates. The AI pricing engine accounts for rain and rush-hour surcharges in real time.</p>
+                  </div>
+                  <div className="step-card">
+                    <span className="step-num">02</span>
+                    <h4>GPS Match</h4>
+                    <p>Drivers nearby receive the load on their job board. The system pairs you with a driver matched to your selected truck class.</p>
+                  </div>
+                  <div className="step-card">
+                    <span className="step-num">03</span>
+                    <h4>Live Tracking</h4>
+                    <p>Watch your cargo move on an interactive map. Telemetry updates keep you updated on the driver's progress.</p>
+                  </div>
+                  <div className="step-card">
+                    <span className="step-num">04</span>
+                    <h4>GST Tax Close</h4>
+                    <p>Once delivered, a legal GST-compliant tax invoice is automatically generated with itemized rates and letterheads.</p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="driver-steps"
+                  className="steps-grid"
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -15 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="step-card">
+                    <span className="step-num">01</span>
+                    <h4>Go Online</h4>
+                    <p>Switch your load board status online. Alerts will sound to notify you of cargo requests matching your truck type.</p>
+                  </div>
+                  <div className="step-card">
+                    <span className="step-num">02</span>
+                    <h4>Accept Job</h4>
+                    <p>Review the payout and route immediately. Claim the load with a single tap before another driver accepts it.</p>
+                  </div>
+                  <div className="step-card">
+                    <span className="step-num">03</span>
+                    <h4>Navigate & Haul</h4>
+                    <p>Get automatic navigation routes. The built-in Leaflet GPS dashboard coordinates pickup and drop-off coordinates.</p>
+                  </div>
+                  <div className="step-card">
+                    <span className="step-num">04</span>
+                    <h4>Secure Payout</h4>
+                    <p>Mark delivered when within the geofenced drop-off zone. Payouts are calculated and added to your logs instantly.</p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </section>
+
         {/* Dynamic Quote Calculator (Prototype Model) */}
         <section id="prototype" className="landing-section">
           <div className="section-header">
-            <h2>Interactive Prototype Model</h2>
-            <p>Try our AI-powered dynamic pricing calculator live without creating an account.</p>
+            <h2>Try the Pricing Engine</h2>
+            <p>Test the dynamic calculator to see how weather and route variables affect cargo fares.</p>
           </div>
 
           <div className="quote-calculator-container">
@@ -192,13 +298,13 @@ export default function LandingPage({ onSelectPortal }) {
                         <strong className="val">₹{quote.breakdown?.distanceCharge || quote.distanceCharge}</strong>
                       </div>
                       {quote.isRaining && (
-                        <div className="result-item charge-highlight">
+                        <div className="result-item charge-highlight rain-surcharge">
                           <span className="label">🌧️ Rain Surcharge (+20%)</span>
                           <strong className="val">₹{quote.breakdown?.rainFee || quote.rainFee}</strong>
                         </div>
                       )}
                       {quote.isRushHour && (
-                        <div className="result-item charge-highlight">
+                        <div className="result-item charge-highlight rush-surcharge">
                           <span className="label">🚦 Peak Hours Surcharge (+15%)</span>
                           <strong className="val">₹{quote.breakdown?.rushHourFee || quote.rushHourFee}</strong>
                         </div>
