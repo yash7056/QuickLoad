@@ -277,32 +277,4 @@ app.get('/api/rides', async (req, res) => {
     } catch (e) { res.status(500).json({ error: "Fetch Failed" }); }
 });
 
-// Copy uploaded images on startup
-try {
-    const fs = require('fs');
-    const path = require('path');
-    const srcDir = 'C:\\Users\\abn\\.gemini\\antigravity\\brain\\5dee3c43-452e-400a-a2e3-b25ecf93eedd';
-    const destCustomerDir = 'C:\\Users\\abn\\Desktop\\QuickLoad\\customer-portal\\public';
-    const destDriverDir = 'C:\\Users\\abn\\Desktop\\QuickLoad\\driver-portal\\public';
-    
-    if (!fs.existsSync(destCustomerDir)) fs.mkdirSync(destCustomerDir, { recursive: true });
-    if (!fs.existsSync(destDriverDir)) fs.mkdirSync(destDriverDir, { recursive: true });
-    
-    const copies = [
-      { src: 'media__1783419011162.png', dest: path.join(destCustomerDir, 'customer-bg-1.png') },
-      { src: 'media__1783419024162.png', dest: path.join(destCustomerDir, 'customer-bg-2.png') },
-      { src: 'media__1783419036013.png', dest: path.join(destCustomerDir, 'customer-bg-3.png') },
-      { src: 'media__1783419058194.png', dest: path.join(destDriverDir, 'driver-bg.png') }
-    ];
-    copies.forEach(({ src, dest }) => {
-      const srcPath = path.join(srcDir, src);
-      if (fs.existsSync(srcPath)) {
-        fs.copyFileSync(srcPath, dest);
-        console.log(`[Asset Copier] Copied ${src} -> ${dest}`);
-      }
-    });
-} catch (err) {
-    console.error('[Asset Copier] Error during startup copy:', err.message);
-}
-
 server.listen(5000, () => console.log('🚀 Server running on port 5000'));
