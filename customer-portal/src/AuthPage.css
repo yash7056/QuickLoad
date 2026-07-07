@@ -87,10 +87,12 @@
   opacity: 0.92;
 }
 .brand-mark-bolt {
-  width: 8px; height: 8px;
+  width: 10px;
+  height: 10px;
   background: var(--ink-on-accent);
   clip-path: polygon(40% 0, 100% 0, 60% 100%, 0 100%);
-  display: inline-block;
+  display: block;
+  flex-shrink: 0;
 }
 
 .brand-headline {

@@ -4,17 +4,28 @@ import { motion, AnimatePresence } from 'framer-motion';
 import AuthPage from './AuthPage';
 import { downloadInvoice } from './invoice';
 import CustomerLiveMap from './CustomerLiveMap';
+import LandingPage from './LandingPage';
+import DriverDashboard from './DriverDashboard';
 import './App.css';
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const socket = io(API);
 
-const PORTAL = {
+const CUSTOMER_PORTAL = {
   key: 'customer',
   label: 'Customer Portal',
   tagline: 'Book a truck in seconds and watch it move, live, all the way to drop-off.',
   loginWelcome: 'Welcome Back',
   registerWelcome: 'Ship With Us',
+  apiBase: API,
+};
+
+const DRIVER_PORTAL = {
+  key: 'driver',
+  label: 'Driver Portal',
+  tagline: 'Open jobs near you, one tap to accept, clear steps for every trip.',
+  loginWelcome: 'Back On The Road',
+  registerWelcome: 'Drive With Us',
   apiBase: API,
 };
 
@@ -30,6 +41,8 @@ const STEP_LABEL = {
 };
 
 export default function App() {
+  const [view, setView] = useState('landing'); // 'landing' | 'customer' | 'driver'
+
   const [user, setUser] = useState(() => {
     try {
       const stored = localStorage.getItem('ssg_customer_user');
@@ -38,6 +51,16 @@ export default function App() {
       return null;
     }
   });
+
+  const [driverUser, setDriverUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem('ssg_driver_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [company, setCompany] = useState(null);
 
   useEffect(() => {
@@ -47,6 +70,14 @@ export default function App() {
       localStorage.removeItem('ssg_customer_user');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (driverUser) {
+      localStorage.setItem('ssg_driver_user', JSON.stringify(driverUser));
+    } else {
+      localStorage.removeItem('ssg_driver_user');
+    }
+  }, [driverUser]);
 
   // booking form
   const [pickup, setPickup] = useState('');
@@ -217,15 +248,46 @@ export default function App() {
     [rides]
   );
 
-  if (!user) return <AuthPage portal={PORTAL} onAuthSuccess={setUser} />;
+  if (view === 'landing') {
+    return <LandingPage onSelectPortal={(selectedView) => setView(selectedView)} />;
+  }
+
+  if (view === 'driver') {
+    if (!driverUser) {
+      return (
+        <AuthPage 
+          portal={DRIVER_PORTAL} 
+          onAuthSuccess={setDriverUser} 
+          onBackToHome={() => setView('landing')} 
+        />
+      );
+    }
+    return (
+      <DriverDashboard 
+        user={driverUser} 
+        setUser={setDriverUser} 
+        onBackToHome={() => setView('landing')} 
+      />
+    );
+  }
+
+  if (view === 'customer' && !user) {
+    return (
+      <AuthPage 
+        portal={CUSTOMER_PORTAL} 
+        onAuthSuccess={setUser} 
+        onBackToHome={() => setView('landing')} 
+      />
+    );
+  }
 
   const stepIndex = activeRide ? STEPS.indexOf(activeRide.status) : -1;
 
   return (
     <div className="dash">
       <header className="dash-top">
-        <div className="dash-brand">
-          <span className="dash-brand-bolt" /> SSG LOGISTICS
+        <div className="dash-brand" onClick={() => setView('landing')} style={{ cursor: 'pointer' }}>
+          <span className="dash-brand-bolt" /> QUICKLOAD
           <span className="dash-portal-tag">Customer</span>
         </div>
         <div className="dash-user">

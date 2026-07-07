@@ -91,7 +91,7 @@ export default function AuthPage({ portal, onAuthSuccess }) {
           <div className="auth-brand-inner">
             <div className="brand-mark">
               <span className="brand-mark-bolt" />
-              SSG&nbsp;LOGISTICS
+              <span>QUICKLOAD</span>
             </div>
             <AnimatePresence mode="wait">
               <motion.div

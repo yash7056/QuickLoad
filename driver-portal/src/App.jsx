@@ -163,7 +163,7 @@ export default function App() {
     <div className="dash">
       <header className="dash-top" style={{ position: 'relative' }}>
         <div className="dash-brand">
-          <span className="dash-brand-bolt" /> SSG LOGISTICS
+          <span className="dash-brand-bolt" /> QUICKLOAD
           <span className="dash-portal-tag">Driver</span>
         </div>
         <div className="dash-user">

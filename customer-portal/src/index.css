@@ -12,7 +12,7 @@
   --ink-500: #46586a;
   --ink-on-accent: #03161a;
 
-  /* ---- accent: teal (customer portal) ---- */
+  /* ---- default accent: teal (customer) ---- */
   --accent: #1fd8d8;
   --accent-deep: #0b7a86;
   --accent-glow: rgba(31, 216, 216, 0.45);
@@ -29,6 +29,20 @@
 
   color-scheme: dark;
   background: var(--bg-void);
+}
+
+.theme-customer {
+  --accent: #1fd8d8;
+  --accent-deep: #0b7a86;
+  --accent-glow: rgba(31, 216, 216, 0.45);
+  --ink-on-accent: #03161a;
+}
+
+.theme-driver {
+  --accent: #f59e0b;
+  --accent-deep: #b45309;
+  --accent-glow: rgba(245, 158, 11, 0.45);
+  --ink-on-accent: #1e1b4b;
 }
 
 * { box-sizing: border-box; }
